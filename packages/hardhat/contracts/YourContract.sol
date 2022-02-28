@@ -91,6 +91,26 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
     }
 
+    function redeem(address redeemer, MintVoucher calldata voucher, bytes memory signature) public payable returns (uint256) {
+    // make sure signature is valid and get the address of the signer
+    address signer = _verify(voucher, signature);
+
+    // make sure that the signer is authorized to mint NFTs
+    require(hasRole(MINTER_ROLE, signer), "Signature invalid or unauthorized");
+
+    // make sure that the redeemer is paying enough to cover the buyer's cost
+    require(msg.value >= voucher.minimumPrice, "Insufficient funds to redeem");
+
+    // first assign the token to the signer, to establish provenance on-chain
+    _mint(signer, voucher.tokenId);
+    _setTokenURI(voucher.tokenId, voucher.uri);
+
+    // transfer the token to the redeemer
+    _transfer(signer, redeemer, voucher.tokenId);
+
+    return voucher.tokenId;
+  }
+
 
     /*************************
      ACCESS CONTROL FUNCTIONS
