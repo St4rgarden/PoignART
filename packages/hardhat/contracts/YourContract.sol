@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
@@ -19,6 +20,16 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+    }
+
+    struct mintVoucher {
+
+        uint tokenId;
+
+        uint minimumPrice;
+
+        string uri;
+
     }
 
     function _baseURI() internal pure override returns (string memory) {
