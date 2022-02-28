@@ -22,6 +22,11 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
         _grantRole(MINTER_ROLE, msg.sender);
     }
 
+    /*************************
+     MAPPING STRUCTS EVENTS
+     *************************/
+
+    // voucher object is signed and stored off-chain to enable and enforce lazy minting
     struct mintVoucher {
 
         uint tokenId;
@@ -32,9 +37,62 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
     }
 
+    /*************************
+     STATE VARIABLES
+     *************************/
+
+    // the merkleRoot allowing authentication of all users from snapshot and community vetting
+    bytes32 merkleRoot;
+
+    /*************************
+     VIEW AND PURE FUNCTIONS
+     *************************/
+
+    // view function returns true if an artist address is part of the merkleTree
+    function _verifyArtist(
+
+        address _artist,
+
+        bytes32[] memory _merkleProof
+    )
+        public
+        view
+        returns (bool valid) {
+
+        bytes32 _leaf = keccak256(abi.encodePacked(_artist));
+
+        return MerkleProof.verify(_merkleProof, merkleRoot, _leaf);
+
+    }
+
+    // view function returns the base token URI slug
     function _baseURI() internal pure override returns (string memory) {
         return "https://creatorsforukraine.io/";
     }
+
+    /*************************
+     USER FUNCTIONS
+     *************************/
+
+    // function authenticates artists through the merkle tree and assigns MINTER_ROLE
+    function vetArtist(
+
+        address _artist,
+
+        bytes32[] memory _merkleProof
+    )
+        public {
+
+        require(_msgSender() == _artist, "Artists have to add themselves!");
+        require(_verifyArtist(_artist, _merkleProof), "Not authorized!");
+        _grantRole(MINTER_ROLE, _artist);
+
+    }
+
+
+    /*************************
+     ACCESS CONTROL FUNCTIONS
+     *************************/
 
     function pause() public onlyRole(PAUSER_ROLE) {
         _pause();
