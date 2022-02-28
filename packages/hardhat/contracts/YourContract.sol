@@ -15,11 +15,13 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
 
     constructor() ERC721("Poignard", "[]++++||=======>") EIP712("PoignardVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(CRON_JOB, msg.sender);
     }
 
     /*************************
@@ -27,11 +29,11 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
      *************************/
 
     // voucher object is signed and stored off-chain to enable and enforce lazy minting
-    struct mintVoucher {
+    struct MintVoucher {
 
-        uint tokenId;
+        uint256 tokenId;
 
-        uint minimumPrice;
+        uint256 minimumPrice;
 
         string uri;
 
@@ -41,8 +43,8 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
      STATE VARIABLES
      *************************/
 
-    // the merkleRoot allowing authentication of all users from snapshot and community vetting
-    bytes32 merkleRoot;
+    // the _merkleRoot allowing authentication of all users from snapshot and community vetting
+    bytes32 _merkleRoot;
 
     /*************************
      VIEW AND PURE FUNCTIONS
@@ -61,7 +63,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
         bytes32 _leaf = keccak256(abi.encodePacked(_artist));
 
-        return MerkleProof.verify(_merkleProof, merkleRoot, _leaf);
+        return MerkleProof.verify(_merkleProof, _merkleRoot, _leaf);
 
     }
 
@@ -101,6 +103,13 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     function unpause() public onlyRole(PAUSER_ROLE) {
         _unpause();
     }
+    
+    function cronJobRoot(
+        bytes32 newRoot
+    )
+        external onlyRole(CRON_JOB) {
+        _merkleRoot = newRoot;
+    }
 
     function safeMint(address to, uint256 tokenId, string memory uri)
         public
@@ -118,6 +127,27 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
         super._beforeTokenTransfer(from, to, tokenId);
     }
 
+    /*************************
+     PRIVATE / INTERNAL
+     *************************/
+
+    function _verify(MintVoucher calldata voucher, bytes memory signature) internal view returns (address) {
+    bytes32 digest = _hash(voucher);
+    return digest.toEthSignedMessageHash().recover(signature);
+  }
+
+    function _hash(MintVoucher calldata voucher) internal view returns (bytes32) {
+    return _hashTypedDataV4(keccak256(abi.encode(
+      keccak256("MintVoucher(uint256 tokenId,uint256 minimumPrice,string uri)"),
+      voucher.tokenId,
+      voucher.minimumPrice,
+      keccak256(bytes(voucher.uri))
+    )));
+  }
+
+    /*************************
+     OVERRIDES
+     *************************/
     // The following functions are overrides required by Solidity.
 
     function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
