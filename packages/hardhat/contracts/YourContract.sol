@@ -8,11 +8,14 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 
-contract YourContract is ERC721, ERC721URIStorage, Pausable, AccessControl {
+contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
+
+    using ECDSA for bytes32;
+
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    constructor() ERC721("Poignard", "[]++++||=======>") {
+    constructor() ERC721("Poignard", "[]++++||=======>") EIP712("PoignardVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
