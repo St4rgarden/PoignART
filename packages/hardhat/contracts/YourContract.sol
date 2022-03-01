@@ -18,6 +18,8 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
+    address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
+    address public constant UKRAINEDAO = 0x633b7218644b83D57d90e7299039ebAb19698e9C;
 
     constructor() ERC721("Poignard", "[]++++||=======>") EIP712("PoignardVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -42,12 +44,21 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
     }
 
+    // event allows indexing of artists who have gained MINTER_ROLE and for which _merkleRoot version
+    event Vetted (
+        // @notice The address of the vetted artist
+        address artist,
+        // @notice The merkleRoot that they used for authentication
+        bytes32 _merkleRoot
+
+        );
+
     /*************************
      STATE VARIABLES
      *************************/
 
     // the _merkleRoot allowing authentication of all users from snapshot and community vetting
-    bytes32 _merkleRoot;
+    bytes32 public _merkleRoot;
 
     /*************************
      MODIFIERS
@@ -92,16 +103,17 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     // function authenticates artists through the merkle tree and assigns MINTER_ROLE
     function vetArtist(
 
-        address _artist,
+        address artist,
 
         bytes32[] memory _merkleProof
     )
         public
         whenNotPaused {
 
-        require(_msgSender() == _artist, "Artists have to add themselves!");
-        require(_verifyArtist(_artist, _merkleProof), "Not authorized!");
-        _grantRole(MINTER_ROLE, _artist);
+        require(_msgSender() == artist, "Artists have to add themselves!");
+        require(_verifyArtist(artist, _merkleProof), "Not authorized!");
+        _grantRole(MINTER_ROLE, artist);
+        emit Vetted(artist, _merkleRoot);
 
     }
 
@@ -153,6 +165,20 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     )
         external onlyRole(CRON_JOB) {
         _merkleRoot = newRoot;
+    }
+
+    /** @dev Function for withdrawing ETH to UkraineDAO and Unchain
+    * Constants are used for transparency and safety
+    */
+    function withdrawAll()
+        public
+        onlyRole(CRON_JOB)
+    {
+        uint balanceLessGas = address(this).balance - tx.gasprice;
+        uint half = balanceLessGas / 2;
+        require(payable(UNCHAIN).send(half));
+        require(payable(UKRAINEDAO).send(half));
+        require(payable(msg.sender).send(tx.gasprice));
     }
 
     function addCron(
