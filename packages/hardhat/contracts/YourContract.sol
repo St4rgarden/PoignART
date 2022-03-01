@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
+// @author Kyle_Stargarden w/ Big thanks to yusefnapora
 pragma solidity ^0.8.4;
+pragma abicoder v2;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -29,12 +31,13 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
      *************************/
 
     // voucher object is signed and stored off-chain to enable and enforce lazy minting
-    struct MintVoucher {
+    struct NFTVoucher {
 
+        // @notice The id of the token to be redeemed. Must be unique - if another token with this ID already exists, the redeem function will revert.
         uint256 tokenId;
-
-        uint256 minimumPrice;
-
+        // @notice The minimum price (in wei) that the NFT creator is willing to accept for the initial sale of this NFT.
+        uint256 minPrice;
+        // @notice The metadata URI to associate with this token.
         string uri;
 
     }
@@ -45,6 +48,16 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
     // the _merkleRoot allowing authentication of all users from snapshot and community vetting
     bytes32 _merkleRoot;
+
+    /*************************
+     MODIFIERS
+     *************************/
+
+    // prevents all contracts from calling the minting functions
+    modifier callerIsUser() {
+        require(tx.origin == msg.sender, "The caller is another contract!");
+        _;
+    }
 
     /*************************
      VIEW AND PURE FUNCTIONS
@@ -83,7 +96,8 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
         bytes32[] memory _merkleProof
     )
-        public {
+        public
+        whenNotPaused {
 
         require(_msgSender() == _artist, "Artists have to add themselves!");
         require(_verifyArtist(_artist, _merkleProof), "Not authorized!");
@@ -91,7 +105,17 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
     }
 
-    function redeem(address redeemer, MintVoucher calldata voucher, bytes memory signature) public payable returns (uint256) {
+    function redeem(
+        address redeemer,
+        NFTVoucher calldata voucher,
+        bytes memory signature
+    )
+        public
+        payable
+        callerIsUser
+        whenNotPaused
+        returns (uint256) {
+
     // make sure signature is valid and get the address of the signer
     address signer = _verify(voucher, signature);
 
@@ -99,7 +123,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     require(hasRole(MINTER_ROLE, signer), "Signature invalid or unauthorized");
 
     // make sure that the redeemer is paying enough to cover the buyer's cost
-    require(msg.value >= voucher.minimumPrice, "Insufficient funds to redeem");
+    require(msg.value >= voucher.minPrice, "Insufficient funds to redeem");
 
     // first assign the token to the signer, to establish provenance on-chain
     _mint(signer, voucher.tokenId);
@@ -123,7 +147,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     function unpause() public onlyRole(PAUSER_ROLE) {
         _unpause();
     }
-    
+
     function cronJobRoot(
         bytes32 newRoot
     )
@@ -139,6 +163,42 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
         _setTokenURI(tokenId, uri);
     }
 
+    /*************************
+     PRIVATE / INTERNAL
+     *************************/
+
+    function _verify(
+    NFTVoucher calldata voucher,
+    bytes memory signature
+    )
+    internal
+    view
+    returns (address) {
+
+    bytes32 digest = _hash(voucher);
+    return digest.toEthSignedMessageHash().recover(signature);
+
+  }
+    /// @notice Returns a hash of the given NFTVoucher, prepared using EIP712 typed data hashing rules.
+    /// @param voucher An NFTVoucher to hash.
+    function _hash(NFTVoucher calldata voucher)
+    internal
+    view
+    returns (bytes32) {
+    return _hashTypedDataV4(keccak256(abi.encode(
+      keccak256("NFTVoucher(uint256 tokenId,uint256 minPrice,string uri)"),
+      voucher.tokenId,
+      voucher.minPrice,
+      keccak256(bytes(voucher.uri))
+    )));
+
+  }
+
+    /*************************
+     OVERRIDES
+     *************************/
+    // The following functions are overrides required by Solidity.
+
     function _beforeTokenTransfer(address from, address to, uint256 tokenId)
         internal
         whenNotPaused
@@ -146,29 +206,6 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     {
         super._beforeTokenTransfer(from, to, tokenId);
     }
-
-    /*************************
-     PRIVATE / INTERNAL
-     *************************/
-
-    function _verify(MintVoucher calldata voucher, bytes memory signature) internal view returns (address) {
-    bytes32 digest = _hash(voucher);
-    return digest.toEthSignedMessageHash().recover(signature);
-  }
-
-    function _hash(MintVoucher calldata voucher) internal view returns (bytes32) {
-    return _hashTypedDataV4(keccak256(abi.encode(
-      keccak256("MintVoucher(uint256 tokenId,uint256 minimumPrice,string uri)"),
-      voucher.tokenId,
-      voucher.minimumPrice,
-      keccak256(bytes(voucher.uri))
-    )));
-  }
-
-    /*************************
-     OVERRIDES
-     *************************/
-    // The following functions are overrides required by Solidity.
 
     function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
         super._burn(tokenId);
