@@ -155,6 +155,14 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
         _merkleRoot = newRoot;
     }
 
+    function addCron(
+        address newCron
+    )
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE) {
+        grantRole(CRON_JOB, newCron);
+    }
+
     function safeMint(address to, uint256 tokenId, string memory uri)
         public
         onlyRole(MINTER_ROLE)
