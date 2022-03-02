@@ -189,18 +189,13 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
         grantRole(CRON_JOB, newCron);
     }
 
-    function safeMint(address to, uint256 tokenId, string memory uri)
-        public
-        onlyRole(MINTER_ROLE)
-    {
-        _safeMint(to, tokenId);
-        _setTokenURI(tokenId, uri);
-    }
-
     /*************************
      PRIVATE / INTERNAL
      *************************/
 
+    /// @notice recovers the address of the original voucher signer from NFTVoucher
+    /// @param voucher that contains necessary data for redeeming an NFT
+    /// @param signature generated from private key and original NFTVoucher object
     function _verify(
     NFTVoucher calldata voucher,
     bytes memory signature
@@ -213,6 +208,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     return digest.toEthSignedMessageHash().recover(signature);
 
   }
+
     /// @notice Returns a hash of the given NFTVoucher, prepared using EIP712 typed data hashing rules.
     /// @param voucher An NFTVoucher to hash.
     function _hash(NFTVoucher calldata voucher)
