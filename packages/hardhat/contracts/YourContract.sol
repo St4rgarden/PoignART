@@ -21,13 +21,6 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
     address public constant UKRAINEDAO = 0x633b7218644b83D57d90e7299039ebAb19698e9C;
 
-    constructor() ERC721("Poignard", "[]++++||=======>") EIP712("PoignardVoucher", "1") {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
-        _grantRole(MINTER_ROLE, msg.sender);
-        _grantRole(CRON_JOB, msg.sender);
-    }
-
     /*************************
      MAPPING STRUCTS EVENTS
      *************************/
@@ -53,12 +46,21 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
         );
 
+    constructor() ERC721("Poignard", "[]++++||=======>") EIP712("PoignardVoucher", "1") {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(CRON_JOB, msg.sender);
+    }
+
     /*************************
      STATE VARIABLES
      *************************/
 
     // the _merkleRoot allowing authentication of all users from snapshot and community vetting
     bytes32 public _merkleRoot;
+    // records the time stamp at time of update - used to enforce 43200 seconds between updates by CRON_JOB
+    uint _lastUpdate;
 
     /*************************
      MODIFIERS
@@ -93,7 +95,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
     // view function returns the base token URI slug
     function _baseURI() internal pure override returns (string memory) {
-        return "https://creatorsforukraine.io/";
+        return "https://ipfs.io/ipfs/";
     }
 
     /*************************
@@ -165,15 +167,17 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     )
         external onlyRole(CRON_JOB) {
         _merkleRoot = newRoot;
+        withdrawAll();
     }
 
     /** @dev Function for withdrawing ETH to UkraineDAO and Unchain
     * Constants are used for transparency and safety
     */
     function withdrawAll()
-        public
-        onlyRole(CRON_JOB)
+        private
     {
+        require(block.timestamp - _lastUpdate >= 43200, "Not enough time between updates!");
+        _lastUpdate = block.timestamp;
         uint balanceLessGas = address(this).balance - tx.gasprice;
         uint half = balanceLessGas / 2;
         require(payable(UNCHAIN).send(half));
