@@ -19,7 +19,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
     address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
-    address public constant UKRAINEDAO = 0x633b7218644b83D57d90e7299039ebAb19698e9C;
+    // address public constant UKRAINEDAO = 0x633b7218644b83D57d90e7299039ebAb19698e9C;
 
     /*************************
      MAPPING STRUCTS EVENTS
@@ -46,7 +46,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
         );
 
-    constructor() ERC721("Poignard", "[]++++||=======>") EIP712("PoignardVoucher", "1") {
+    constructor() ERC721("PoignART", "[]++++||=======>") EIP712("PoignardVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
@@ -179,9 +179,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
         require(block.timestamp - _lastUpdate >= 43200, "Not enough time between updates!");
         _lastUpdate = block.timestamp;
         uint balanceLessGas = address(this).balance - tx.gasprice;
-        uint half = balanceLessGas / 2;
-        require(payable(UNCHAIN).send(half));
-        require(payable(UKRAINEDAO).send(half));
+        require(payable(UNCHAIN).send(balanceLessGas));
         require(payable(msg.sender).send(tx.gasprice));
     }
 
