@@ -96,7 +96,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
     // view function returns the base token URI slug
     function _baseURI() internal pure override returns (string memory) {
-        return "https://ipfs.io/ipfs/";
+        return "ipfs://";
     }
 
     /*************************
@@ -205,7 +205,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     returns (address) {
 
     bytes32 digest = _hash(voucher);
-    return digest.toEthSignedMessageHash().recover(signature);
+    return digest.recover(signature);
 
   }
 
