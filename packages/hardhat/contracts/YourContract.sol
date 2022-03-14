@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-// @author Kyle_Stargarden w/ Big thanks to yusefnapora
+// @author Kyle_Stargarden w/ Big thanks to yusefnapora and NFTCulture
 pragma solidity ^0.8.4;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "./Parents/ERC721Public.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -19,6 +19,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
     address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
+    address public constant TEST = 0x66F59a4181f43b96fE929b711476be15C96B83B3;
     // address public constant UKRAINEDAO = 0x633b7218644b83D57d90e7299039ebAb19698e9C;
 
     /*************************
@@ -162,25 +163,22 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
         _unpause();
     }
 
+    // function for adding new updated roots for vetting process
     function cronJobRoot(
         bytes32 newRoot
     )
-        external onlyRole(CRON_JOB) {
+        external onlyRole(CRON_JOB) whenNotPaused {
         _merkleRoot = newRoot;
-        withdrawAll();
     }
 
-    /** @dev Function for withdrawing ETH to UkraineDAO and Unchain
+    /** @dev Function for withdrawing ETH to Unchain
     * Constants are used for transparency and safety
     */
     function withdrawAll()
-        private
+        public
+        onlyRole(CRON_JOB)
     {
-        require(block.timestamp - _lastUpdate >= 43200, "Not enough time between updates!");
-        _lastUpdate = block.timestamp;
-        uint balanceLessGas = address(this).balance - tx.gasprice;
-        require(payable(UNCHAIN).send(balanceLessGas));
-        require(payable(msg.sender).send(tx.gasprice));
+        require(payable(TEST).send(address(this).balance));
     }
 
     function addCron(
