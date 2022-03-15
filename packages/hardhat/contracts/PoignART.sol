@@ -179,6 +179,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         public
         onlyRole(CRON_JOB)
     {
+        require(block.timestamp < 1648083600, "GR 13 is closed");
         uint half = address(this).balance / 2;
         require(payable(UNCHAIN).send(half));
         require(payable(GITCOIN).send(half));
