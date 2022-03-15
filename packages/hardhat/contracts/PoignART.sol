@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
+contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     using ECDSA for bytes32;
 
@@ -19,6 +19,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
     address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
+    address public constant GITCOIN = 0xde21F729137C5Af1b01d73aF1dC21eFfa2B8a0d6;
     address public constant TEST = 0x66F59a4181f43b96fE929b711476be15C96B83B3;
     // address public constant UKRAINEDAO = 0x633b7218644b83D57d90e7299039ebAb19698e9C;
 
@@ -47,7 +48,7 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
 
         );
 
-    constructor() ERC721("PoignART", "[]++++||=======>") EIP712("PoignardVoucher", "1") {
+    constructor() ERC721("PoignART", "[+++||=====>") EIP712("PoignardVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
@@ -171,10 +172,32 @@ contract YourContract is ERC721, EIP712, ERC721URIStorage, Pausable, AccessContr
         _merkleRoot = newRoot;
     }
 
-    /** @dev Function for withdrawing ETH to Unchain
+    /** @dev Function for withdrawing ETH to Unchain via Giveth and Gitcoin
+    * Constants are used for transparency and safety
+    */
+    function withdrawAllSplit()
+        public
+        onlyRole(CRON_JOB)
+    {
+        uint half = address(this).balance / 2;
+        require(payable(UNCHAIN).send(half));
+        require(payable(GITCOIN).send(half));
+    }
+
+    /** @dev Function for withdrawing ETH to our test address
     * Constants are used for transparency and safety
     */
     function withdrawAll()
+        public
+        onlyRole(CRON_JOB)
+    {
+        require(payable(UNCHAIN).send(address(this).balance));
+    }
+
+    /** @dev Function for withdrawing ETH to our test address
+    * Constants are used for transparency and safety
+    */
+    function testWithdrawAll()
         public
         onlyRole(CRON_JOB)
     {

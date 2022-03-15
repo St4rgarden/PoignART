@@ -12,7 +12,7 @@ import { Link } from "react-router-dom";
 function Home({ yourLocalBalance, readContracts }) {
   // you can also use hooks locally in your component of choice
   // in this case, let's keep track of 'purpose' variable from our contract
-  const purpose = useContractReader(readContracts, "YourContract", "purpose");
+  const purpose = useContractReader(readContracts, "PoignART", "purpose");
 
   return (
     <div>
@@ -33,7 +33,7 @@ function Home({ yourLocalBalance, readContracts }) {
           className="highlight"
           style={{ marginLeft: 4, /* backgroundColor: "#f9f9f9", */ padding: 4, borderRadius: 4, fontWeight: "bolder" }}
         >
-          YourContract.sol
+          PoignART.sol
         </span>{" "}
         in{" "}
         <span
