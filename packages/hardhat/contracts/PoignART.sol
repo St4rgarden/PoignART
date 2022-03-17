@@ -183,7 +183,6 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     */
     function withdrawAllSplit()
         public
-        onlyRole(CRON_JOB)
     {
         require(block.timestamp < 1648083600, "GR 13 is closed!  Use withdrawAll");
         uint half = address(this).balance / 2;
@@ -197,7 +196,6 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     */
     function withdrawAll()
         public
-        onlyRole(CRON_JOB)
     {
         require(block.timestamp > 1648083600, "GR 13 is still open! Use withdrawAllSplit");
         emit Withdraw(address(this).balance);
