@@ -18,9 +18,8 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
-    address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
+    address public constant GIVETH = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
     address public constant GITCOIN = 0xde21F729137C5Af1b01d73aF1dC21eFfa2B8a0d6;
-    address public constant TEST = 0x66F59a4181f43b96fE929b711476be15C96B83B3;
     // address public constant UKRAINEDAO = 0x633b7218644b83D57d90e7299039ebAb19698e9C;
 
     /*************************
@@ -39,11 +38,10 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     }
 
-    // event for withdrawal to both Gitcoin Unchain and Giveth Unchain
-    event WithdrawSplit(uint indexed gitcoinUnchain, uint indexed givethUnchain);
-
-    // event for withdrawal after GR13
-    event Withdraw(uint indexed givethUnchain);
+    // event for indexing withdrawals
+    event Withdraw(address indexed recipient, uint value);
+    // event for indexing redeems
+    event Redeem(address indexed signer, address indexed redeemer, uint tokenId, uint value);
 
     // event allows indexing of artists who have gained MINTER_ROLE and for which _merkleRoot version
     event Vetted (
@@ -154,6 +152,8 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     // transfer the token to the redeemer
     _transfer(signer, redeemer, voucher.tokenId);
 
+    emit Redeem(signer, redeemer, voucher.tokenId, msg.value);
+
     return voucher.tokenId;
   }
 
@@ -186,30 +186,21 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     {
         require(block.timestamp < 1648083600, "GR 13 is closed!  Use withdrawAll");
         uint half = address(this).balance / 2;
-        emit WithdrawSplit(half, half);
-        require(payable(UNCHAIN).send(half));
+        emit Withdraw(GIVETH, half);
+        emit Withdraw(GITCOIN, half);
+        require(payable(GIVETH).send(half));
         require(payable(GITCOIN).send(half));
     }
 
-    /** @dev Function for withdrawing ETH to our test address
+    /** @dev Function for withdrawing ETH to Unchain via Giveth
     * Constants are used for transparency and safety
     */
     function withdrawAll()
         public
     {
         require(block.timestamp > 1648083600, "GR 13 is still open! Use withdrawAllSplit");
-        emit Withdraw(address(this).balance);
-        require(payable(UNCHAIN).send(address(this).balance));
-    }
-
-    /** @dev Function for withdrawing ETH to our test address
-    * Constants are used for transparency and safety
-    */
-    function testWithdrawAll()
-        public
-        onlyRole(CRON_JOB)
-    {
-        require(payable(TEST).send(address(this).balance));
+        emit Withdraw(GIVETH, address(this).balance);
+        require(payable(GIVETH).send(address(this).balance));
     }
 
     function addCron(
