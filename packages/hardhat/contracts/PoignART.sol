@@ -39,6 +39,12 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     }
 
+    // event for withdrawal to both Gitcoin Unchain and Giveth Unchain
+    event WithdrawSplit(uint indexed gitcoinUnchain, uint indexed givethUnchain);
+
+    // event for withdrawal after GR13
+    event Withdraw(uint indexed givethUnchain);
+
     // event allows indexing of artists who have gained MINTER_ROLE and for which _merkleRoot version
     event Vetted (
         // @notice The address of the vetted artist
@@ -179,8 +185,9 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         public
         onlyRole(CRON_JOB)
     {
-        require(block.timestamp < 1648083600, "GR 13 is closed");
+        require(block.timestamp < 1648083600, "GR 13 is closed!  Use withdrawAll");
         uint half = address(this).balance / 2;
+        emit WithdrawSplit(half, half);
         require(payable(UNCHAIN).send(half));
         require(payable(GITCOIN).send(half));
     }
@@ -192,6 +199,8 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         public
         onlyRole(CRON_JOB)
     {
+        require(block.timestamp > 1648083600, "GR 13 is still open! Use withdrawAllSplit");
+        emit Withdraw(address(this).balance);
         require(payable(UNCHAIN).send(address(this).balance));
     }
 
