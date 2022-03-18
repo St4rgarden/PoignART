@@ -39,6 +39,24 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     }
 
+    // voucher object is signed and stored off-chain to enable and enforce dutch auction with lazy minting
+    struct AuctionNFTVoucher {
+
+        // @notice The id of the token to be redeemed
+        uint256 tokenId;
+        // @notice The maximum starting price of the Dutch Auction
+        uint256 maxPrice;
+        // @notice The minimum final price of the Dutch Auction
+        uint256 minPrice;
+        // @notice The metadata URI to associate with this token
+        string uri;
+        // @notice The starting time of the Dutch Auction
+        uint256 startTime;
+        // @notice The ending time of the Dutch Auction
+        uint256 endTime;
+
+    }
+
     // event for withdrawal to both Gitcoin Unchain and Giveth Unchain
     event WithdrawSplit(uint indexed gitcoinUnchain, uint indexed givethUnchain);
 
@@ -106,6 +124,32 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         return "ipfs://";
     }
 
+    // current price of Dutch Auction
+    function getAuctionPrice(AuctionNFTVoucher calldata voucher)
+        public view returns (uint256) {
+
+        // calculate total possible price reduction
+        uint256 maxPriceReduction = voucher.maxPrice - voucher.minPrice;
+
+        // total time of the auction in seconds
+        uint256 totalAuctionLength = voucher.endTime - voucher.startTime;
+
+        // price reduction per second
+        uint256 reductionMultiplier = maxPriceReduction / totalAuctionLength;
+
+        // number of seconds since the auction started
+        uint256 auctionSeconds = block.timestamp - voucher.startTime;
+
+        // the total price reduction at the current timestamp
+        uint256 priceReduction = reductionMultiplier * auctionSeconds;
+
+        // price at the current timestamp
+        uint256 currentPrice = voucher.maxPrice - priceReduction;
+
+        return currentPrice;
+
+    }
+
     /*************************
      USER FUNCTIONS
      *************************/
@@ -146,6 +190,42 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     // make sure that the redeemer is paying enough to cover the buyer's cost
     require(msg.value >= voucher.minPrice, "Insufficient funds to redeem");
+
+    // first assign the token to the signer, to establish provenance on-chain
+    _mint(signer, voucher.tokenId);
+    _setTokenURI(voucher.tokenId, voucher.uri);
+
+    // transfer the token to the redeemer
+    _transfer(signer, redeemer, voucher.tokenId);
+
+    return voucher.tokenId;
+  }
+
+    function redeemAuction(
+        address redeemer,
+        AuctionNFTVoucher calldata voucher,
+        bytes memory signature
+    )
+        public
+        payable
+        callerIsUser
+        whenNotPaused
+        returns (uint256) {
+
+    // require that the auction has not ended
+    require(block.timestamp < voucher.endTime, "Auction has finished");
+
+    // make sure signature is valid and get the address of the signer
+    address signer = _verifyAuction(voucher, signature);
+
+    // make sure that the signer is authorized to mint NFTs
+    require(hasRole(MINTER_ROLE, signer), "Signature invalid or unauthorized");
+
+    // calculate the current price for Dutch AuctionNFTVoucher
+    uint currentPrice = getAuctionPrice(voucher);
+
+    // make sure that the redeemer is paying enough to cover the buyer's cost
+    require(msg.value >= currentPrice, "Insufficient funds to redeem");
 
     // first assign the token to the signer, to establish provenance on-chain
     _mint(signer, voucher.tokenId);
@@ -240,6 +320,19 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
   }
 
+    function _verifyAuction(
+    AuctionNFTVoucher calldata voucher,
+    bytes memory signature
+    )
+    internal
+    view
+    returns (address) {
+
+    bytes32 digest = _hashAuction(voucher);
+    return digest.recover(signature);
+
+  }
+
     /// @notice Returns a hash of the given NFTVoucher, prepared using EIP712 typed data hashing rules.
     /// @param voucher An NFTVoucher to hash.
     function _hash(NFTVoucher calldata voucher)
@@ -251,6 +344,24 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
       voucher.tokenId,
       voucher.minPrice,
       keccak256(bytes(voucher.uri))
+    )));
+
+  }
+
+    /// @notice Returns a hash of the given NFTVoucher, prepared using EIP712 typed data hashing rules.
+    /// @param voucher An NFTVoucher to hash.
+    function _hashAuction(AuctionNFTVoucher calldata voucher)
+    internal
+    view
+    returns (bytes32) {
+    return _hashTypedDataV4(keccak256(abi.encode(
+      keccak256("AuctionNFTVoucher(uint256 tokenId,uint256 maxPrice,uint256 minPrice,string uri,uint256 startTime,uint256 endTime)"),
+      voucher.tokenId,
+      voucher.maxPrice,
+      voucher.minPrice,
+      keccak256(bytes(voucher.uri)),
+      voucher.startTime,
+      voucher.endTime
     )));
 
   }
