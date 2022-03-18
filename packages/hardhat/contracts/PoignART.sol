@@ -18,7 +18,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
-    uint public constant minimumPrice = 0.025 ether;
+    uint public constant MINIMUMPRICE = 0.025 ether;
     address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
     address public constant GITCOIN = 0xde21F729137C5Af1b01d73aF1dC21eFfa2B8a0d6;
     address public constant TEST = 0x66F59a4181f43b96fE929b711476be15C96B83B3;
@@ -104,11 +104,11 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
      *************************/
 
     // view function returns true if an artist address is part of the merkleTree
-    function _verifyArtist(
+    function _verify(
 
         address _artist,
 
-        bytes32[] memory _merkleProof
+        bytes32[] calldata _merkleProof
     )
         public
         view
@@ -160,19 +160,21 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
         address artist,
 
-        bytes32[] memory _merkleProof
+        bytes32[] calldata _merkleProof
     )
         public
         whenNotPaused {
 
         require(_msgSender() == artist, "Artists have to add themselves!");
-        require(_verifyArtist(artist, _merkleProof), "Not authorized!");
+        require(_verify(artist, _merkleProof), "Not authorized!");
         _grantRole(MINTER_ROLE, artist);
         emit Vetted(artist, _merkleRoot);
 
     }
 
-    function redeem(
+
+    // function allows collectors to purchase and mint NFTs of artist's with MINTER_ROLE
+    function redeemByRole(
         address redeemer,
         NFTVoucher calldata voucher,
         bytes memory signature
@@ -186,26 +188,58 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     // make sure signature is valid and get the address of the signer
     address signer = _verify(voucher, signature);
 
-    // make sure that the signer is authorized to mint NFTs
-    require(hasRole(MINTER_ROLE, signer), "Signature invalid or unauthorized");
+    // make sure that the signer is authorized to mint NFTs via MINTER_ROLE
+    require(hasRole(MINTER_ROLE, signer), "Signature invalid or unauthorized!");
 
     // require the current price is above 0.025 ETH
-    require(voucher.minPrice > minimumPrice, "Price must be greater than 0.025 eth!");
+    require(voucher.minPrice > MINIMUMPRICE, "Price must be greater than 0.025 eth!");
 
     // make sure that the redeemer is paying enough to cover the buyer's cost
-    require(msg.value >= voucher.minPrice, "Insufficient funds to redeem");
+    require(msg.value >= voucher.minPrice, "Insufficient funds to redeem!");
 
-    // first assign the token to the signer, to establish provenance on-chain
-    _mint(signer, voucher.tokenId);
+    // mint token to collector and set it's IPFS URI
+    _mint(redeemer, voucher.tokenId);
     _setTokenURI(voucher.tokenId, voucher.uri);
-
-    // transfer the token to the redeemer
-    _transfer(signer, redeemer, voucher.tokenId);
 
     return voucher.tokenId;
   }
 
-    function redeemAuction(
+
+    // function allows collectors to purchase and mint NFTs of artist's who belong to the merkle tree
+    function redeemByMerkle(
+        address redeemer,
+        NFTVoucher calldata voucher,
+        bytes memory signature,
+        bytes32[] calldata _merkleProof
+    )
+        public
+        payable
+        callerIsUser
+        whenNotPaused
+        returns (uint256) {
+
+    // make sure signature is valid and get the address of the signer
+    address signer = _verify(voucher, signature);
+
+    // make sure that the signer is authorized to mint NFTs via merkle tree
+    require(_verify(signer, _merkleProof), "Not authorized!");
+
+    // require the current price is above 0.025 ETH
+    require(voucher.minPrice > MINIMUMPRICE, "Price must be greater than 0.025 eth!");
+
+    // make sure that the redeemer is paying enough to cover the buyer's cost
+    require(msg.value >= voucher.minPrice, "Insufficient funds to redeem");
+
+    // mint token to collector and set it's IPFS URI
+    _mint(redeemer, voucher.tokenId);
+    _setTokenURI(voucher.tokenId, voucher.uri);
+
+    return voucher.tokenId;
+  }
+
+
+    // allows collectors to purchase and mint auctioned NFTs of artist's with MINTER_ROLE through
+    function redeemAuctionRole(
         address redeemer,
         AuctionNFTVoucher calldata voucher,
         bytes memory signature
@@ -225,24 +259,62 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     // make sure signature is valid and get the address of the signer
     address signer = _verifyAuction(voucher, signature);
 
-    // make sure that the signer is authorized to mint NFTs
+    // make sure that the signer is authorized to mint NFTs via MINTER_ROLE
     require(hasRole(MINTER_ROLE, signer), "Signature invalid or unauthorized");
+
+    // calculate the current price for this Dutch Auction
+    uint currentPrice = getAuctionPrice(voucher);
+
+    // require the current price is above 0.025 ETH
+    require(currentPrice > MINIMUMPRICE, "Price must be greater than 0.025 eth!");
+
+    // make sure that the redeemer is paying enough to cover the buyer's cost
+    require(msg.value >= currentPrice, "Insufficient funds to redeem");
+
+    // mint token to collector and set it's IPFS URI
+    _mint(redeemer, voucher.tokenId);
+    _setTokenURI(voucher.tokenId, voucher.uri);
+
+    return voucher.tokenId;
+  }
+
+    // allows collectors to purchase and mint auctioned NFTs of artist's who belong to merkle tree
+    function redeemAuctionMerkle(
+        address redeemer,
+        AuctionNFTVoucher calldata voucher,
+        bytes memory signature,
+        bytes32[] calldata _merkleProof
+    )
+        public
+        payable
+        callerIsUser
+        whenNotPaused
+        returns (uint256) {
+
+    // require that the auction has not ended
+    require(block.timestamp < voucher.endTime, "Auction has finished!");
+
+    // require that the auction has started
+    require(block.timestamp > voucher.startTime, "Auction hasn't started!");
+
+    // make sure signature is valid and get the address of the signer
+    address signer = _verifyAuction(voucher, signature);
+
+    // make sure that the signer is authorized to mint NFTs via merkle tree
+    require(_verify(signer, _merkleProof), "Not authorized!");
 
     // calculate the current price for Dutch AuctionNFTVoucher
     uint currentPrice = getAuctionPrice(voucher);
 
     // require the current price is above 0.025 ETH
-    require(currentPrice > minimumPrice, "Price must be greater than 0.025 eth!");
+    require(currentPrice > MINIMUMPRICE, "Price must be greater than 0.025 eth!");
 
     // make sure that the redeemer is paying enough to cover the buyer's cost
     require(msg.value >= currentPrice, "Insufficient funds to redeem");
 
-    // first assign the token to the signer, to establish provenance on-chain
-    _mint(signer, voucher.tokenId);
+    // mint token to collector and set it's IPFS URI
+    _mint(redeemer, voucher.tokenId);
     _setTokenURI(voucher.tokenId, voucher.uri);
-
-    // transfer the token to the redeemer
-    _transfer(signer, redeemer, voucher.tokenId);
 
     return voucher.tokenId;
   }
