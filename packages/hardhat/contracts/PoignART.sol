@@ -18,6 +18,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
+    bytes32 public constant VETTER_ROLE = keccak256("VETTER_ROLE");
     uint public constant MINIMUMPRICE = 0.025 ether;
     address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
     address public constant GITCOIN = 0xde21F729137C5Af1b01d73aF1dC21eFfa2B8a0d6;
@@ -70,14 +71,16 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         address artist,
         // @notice The merkleRoot that they used for authentication
         bytes32 _merkleRoot
+    );
 
-        );
 
     constructor() ERC721("PoignART", "[+++||=====>") EIP712("PoignardVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(CRON_JOB, msg.sender);
+        _grantRole(VETTER_ROLE, msg.sender);
+        _setRoleAdmin(MINTER_ROLE, VETTER_ROLE);
     }
 
     /*************************
@@ -330,6 +333,10 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     function unpause() public onlyRole(PAUSER_ROLE) {
         _unpause();
+    }
+
+    function setRoleAdmin(bytes32 role, bytes32 adminRole) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setRoleAdmin(role, adminRole);
     }
 
     // function for adding new updated roots for vetting process
