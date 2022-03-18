@@ -18,6 +18,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
+    uint public constant minimumPrice = 0.025 ether;
     address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
     address public constant GITCOIN = 0xde21F729137C5Af1b01d73aF1dC21eFfa2B8a0d6;
     address public constant TEST = 0x66F59a4181f43b96fE929b711476be15C96B83B3;
@@ -188,6 +189,9 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     // make sure that the signer is authorized to mint NFTs
     require(hasRole(MINTER_ROLE, signer), "Signature invalid or unauthorized");
 
+    // require the current price is above 0.025 ETH
+    require(voucher.minPrice > minimumPrice, "Price must be greater than 0.025 eth!");
+
     // make sure that the redeemer is paying enough to cover the buyer's cost
     require(msg.value >= voucher.minPrice, "Insufficient funds to redeem");
 
@@ -213,7 +217,10 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         returns (uint256) {
 
     // require that the auction has not ended
-    require(block.timestamp < voucher.endTime, "Auction has finished");
+    require(block.timestamp < voucher.endTime, "Auction has finished!");
+
+    // require that the auction has started
+    require(block.timestamp > voucher.startTime, "Auction hasn't started!");
 
     // make sure signature is valid and get the address of the signer
     address signer = _verifyAuction(voucher, signature);
@@ -223,6 +230,9 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     // calculate the current price for Dutch AuctionNFTVoucher
     uint currentPrice = getAuctionPrice(voucher);
+
+    // require the current price is above 0.025 ETH
+    require(currentPrice > minimumPrice, "Price must be greater than 0.025 eth!");
 
     // make sure that the redeemer is paying enough to cover the buyer's cost
     require(msg.value >= currentPrice, "Insufficient funds to redeem");
