@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// @author Kyle_Stargarden w/ Big thanks to yusefnapora and NFTCulture
+// @author @st4rgarden w/ Big thanks to yusefnapora and NFTCulture and NiftyMike
 pragma solidity ^0.8.4;
 pragma abicoder v2;
 
