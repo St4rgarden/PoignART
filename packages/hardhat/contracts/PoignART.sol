@@ -81,6 +81,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         _grantRole(CRON_JOB, msg.sender);
         _grantRole(VETTER_ROLE, msg.sender);
         _setRoleAdmin(MINTER_ROLE, VETTER_ROLE);
+        _auctionPaused = true;
     }
 
     /*************************
@@ -91,6 +92,8 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     bytes32 public _merkleRoot;
     // records the time stamp at time of update - used to enforce 43200 seconds between updates by CRON_JOB
     uint _lastUpdate;
+    // dutch auction pause flag
+    bool _auctionPaused;
 
     /*************************
      MODIFIERS
@@ -102,9 +105,22 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         _;
     }
 
+    // prevents using the auction functionality unless it's unpaused
+    modifier whenAuctionNotPaused() {
+        require(!auctionPaused(), "Pausable: Auction paused");
+        _;
+    }
+
     /*************************
      VIEW AND PURE FUNCTIONS
      *************************/
+
+    /**
+     * @dev Returns true if the contract is paused, and false otherwise.
+     */
+    function auctionPaused() public view virtual returns (bool) {
+        return _auctionPaused;
+    }
 
     // view function returns true if an artist address is part of the merkleTree
     function _verify(
@@ -250,7 +266,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         public
         payable
         callerIsUser
-        whenNotPaused
+        whenAuctionNotPaused
         returns (uint256) {
 
     // require that the auction has not ended
@@ -291,7 +307,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         public
         payable
         callerIsUser
-        whenNotPaused
+        whenAuctionNotPaused
         returns (uint256) {
 
     // require that the auction has not ended
