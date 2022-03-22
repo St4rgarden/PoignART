@@ -4,14 +4,14 @@ pragma solidity ^0.8.4;
 pragma abicoder v2;
 
 import "./Parents/ERC721Public.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "./Parents/ERC721URIStoragePublic.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
+contract PoignART is ERC721Public, EIP712, ERC721URIStoragePublic, Pausable, AccessControl {
 
     using ECDSA for bytes32;
 
@@ -52,7 +52,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
         );
 
-    constructor() ERC721("PoignART", "[+++||=====>") EIP712("PoignardVoucher", "1") {
+    constructor() ERC721Public("PoignART", "[+++||=====>") EIP712("PoignardVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
@@ -259,14 +259,14 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         super._beforeTokenTransfer(from, to, tokenId);
     }
 
-    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
+    function _burn(uint256 tokenId) internal override(ERC721Public, ERC721URIStoragePublic) {
         super._burn(tokenId);
     }
 
     function tokenURI(uint256 tokenId)
         public
         view
-        override(ERC721, ERC721URIStorage)
+        override(ERC721Public, ERC721URIStoragePublic)
         returns (string memory)
     {
         return super.tokenURI(tokenId);
@@ -275,7 +275,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC721, AccessControl)
+        override(ERC721Public, AccessControl)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
