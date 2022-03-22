@@ -43,15 +43,6 @@ contract PoignART is ERC721Public, EIP712, ERC721URIStoragePublic, Pausable, Acc
     // event for indexing redeems
     event Redeem(address indexed signer, address indexed redeemer, uint tokenId, uint value);
 
-    // event allows indexing of artists who have gained MINTER_ROLE and for which _merkleRoot version
-    event Vetted (
-        // @notice The address of the vetted artist
-        address artist,
-        // @notice The merkleRoot that they used for authentication
-        bytes32 _merkleRoot
-
-        );
-
     constructor() ERC721Public("PoignART", "[+++||=====>") EIP712("PoignardVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
@@ -65,8 +56,6 @@ contract PoignART is ERC721Public, EIP712, ERC721URIStoragePublic, Pausable, Acc
 
     // the _merkleRoot allowing authentication of all users from snapshot and community vetting
     bytes32 public _merkleRoot;
-    // records the time stamp at time of update - used to enforce 43200 seconds between updates by CRON_JOB
-    uint _lastUpdate;
 
     /*************************
      MODIFIERS
@@ -108,27 +97,11 @@ contract PoignART is ERC721Public, EIP712, ERC721URIStoragePublic, Pausable, Acc
      USER FUNCTIONS
      *************************/
 
-    // function authenticates artists through the merkle tree and assigns MINTER_ROLE
-    function vetArtist(
-
-        address artist,
-
-        bytes32[] memory _merkleProof
-    )
-        public
-        whenNotPaused {
-
-        require(_msgSender() == artist, "Artists have to add themselves!");
-        require(_verifyArtist(artist, _merkleProof), "Not authorized!");
-        _grantRole(MINTER_ROLE, artist);
-        emit Vetted(artist, _merkleRoot);
-
-    }
-
     function redeem(
         address redeemer,
         NFTVoucher calldata voucher,
-        bytes memory signature
+        bytes calldata signature,
+        bytes32[] calldata merkleProof
     )
         public
         payable
@@ -139,19 +112,17 @@ contract PoignART is ERC721Public, EIP712, ERC721URIStoragePublic, Pausable, Acc
     // make sure signature is valid and get the address of the signer
     address signer = _verify(voucher, signature);
 
-    // make sure that the signer is authorized to mint NFTs
-    require(hasRole(MINTER_ROLE, signer), "Signature invalid or unauthorized");
+    // make sure that the signer is authorized to mint NFTs via merkle tree
+    require(_verifyArtist(signer, merkleProof), "Not authorized!");
 
     // make sure that the redeemer is paying enough to cover the buyer's cost
     require(msg.value >= voucher.minPrice, "Insufficient funds to redeem");
 
-    // first assign the token to the signer, to establish provenance on-chain
-    _mint(signer, voucher.tokenId);
+    // mint the token to collector and set it's uri to the IPFS hash
+    _mint(redeemer, voucher.tokenId);
     _setTokenURI(voucher.tokenId, voucher.uri);
 
-    // transfer the token to the redeemer
-    _transfer(signer, redeemer, voucher.tokenId);
-
+    // index creator, collector and payment data for subgraph
     emit Redeem(signer, redeemer, voucher.tokenId, msg.value);
 
     return voucher.tokenId;
@@ -161,6 +132,32 @@ contract PoignART is ERC721Public, EIP712, ERC721URIStoragePublic, Pausable, Acc
     /*************************
      ACCESS CONTROL FUNCTIONS
      *************************/
+
+    // allows extended functionality for Dutch Auction etc
+    function extendedMinting(
+        address redeemer,
+        address signer,
+        uint price,
+        uint tokenId,
+        string calldata uri
+    )
+        external
+        payable
+        onlyRole(MINTER_ROLE)
+        returns (uint256) {
+
+        //enforce the minimum price
+        require(msg.value >= price, "Insufficient funds to redeem");
+
+        // mint the token to collector and set it's uri to the IPFS hash
+        _mint(redeemer, tokenId);
+        _setTokenURI(tokenId, uri);
+
+        // index creator, collector and payment data for subgraph
+        emit Redeem(signer, redeemer, tokenId, msg.value);
+
+        return tokenId;
+    }
 
     function pause() public onlyRole(PAUSER_ROLE) {
         _pause();
@@ -174,7 +171,9 @@ contract PoignART is ERC721Public, EIP712, ERC721URIStoragePublic, Pausable, Acc
     function cronJobRoot(
         bytes32 newRoot
     )
-        external onlyRole(CRON_JOB) whenNotPaused {
+        external onlyRole(CRON_JOB)
+        whenNotPaused
+        callerIsUser {
         _merkleRoot = newRoot;
     }
 
