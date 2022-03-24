@@ -43,7 +43,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     // event for indexing redeems
     event Redeem(address indexed signer, address indexed redeemer, uint tokenId, uint value);
 
-    constructor() ERC721("PoignART", "[+++||=====>") EIP712("PoignardVoucher", "1") {
+    constructor() ERC721("PoignART", "[+++||=====>") EIP712("PoignartVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
