@@ -3,7 +3,6 @@
 pragma solidity ^0.8.4;
 pragma abicoder v2;
 
-import "./Parents/ERC721Public.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -15,12 +14,13 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     using ECDSA for bytes32;
 
+    // #todo change the GIVETH AND GITCOIN addresses to be correct
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
-    address public constant GIVETH = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
-    address public constant GITCOIN = 0xde21F729137C5Af1b01d73aF1dC21eFfa2B8a0d6;
-    // address public constant UKRAINEDAO = 0x633b7218644b83D57d90e7299039ebAb19698e9C;
+    address public constant CRON = 0x66F59a4181f43b96fE929b711476be15C96B83B3;
+    // address public constant GIVETH = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
+    // address public constant GITCOIN = 0xde21F729137C5Af1b01d73aF1dC21eFfa2B8a0d6;
 
     /*************************
      MAPPING STRUCTS EVENTS
@@ -43,15 +43,6 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     // event for indexing redeems
     event Redeem(address indexed signer, address indexed redeemer, uint tokenId, uint value);
 
-    // event allows indexing of artists who have gained MINTER_ROLE and for which _merkleRoot version
-    event Vetted (
-        // @notice The address of the vetted artist
-        address artist,
-        // @notice The merkleRoot that they used for authentication
-        bytes32 _merkleRoot
-
-        );
-
     constructor() ERC721("PoignART", "[+++||=====>") EIP712("PoignardVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
@@ -65,8 +56,6 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     // the _merkleRoot allowing authentication of all users from snapshot and community vetting
     bytes32 public _merkleRoot;
-    // records the time stamp at time of update - used to enforce 43200 seconds between updates by CRON_JOB
-    uint _lastUpdate;
 
     /*************************
      MODIFIERS
@@ -108,27 +97,11 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
      USER FUNCTIONS
      *************************/
 
-    // function authenticates artists through the merkle tree and assigns MINTER_ROLE
-    function vetArtist(
-
-        address artist,
-
-        bytes32[] memory _merkleProof
-    )
-        public
-        whenNotPaused {
-
-        require(_msgSender() == artist, "Artists have to add themselves!");
-        require(_verifyArtist(artist, _merkleProof), "Not authorized!");
-        _grantRole(MINTER_ROLE, artist);
-        emit Vetted(artist, _merkleRoot);
-
-    }
-
     function redeem(
         address redeemer,
         NFTVoucher calldata voucher,
-        bytes memory signature
+        bytes calldata signature,
+        bytes32[] calldata merkleProof
     )
         public
         payable
@@ -140,17 +113,14 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     address signer = _verify(voucher, signature);
 
     // make sure that the signer is authorized to mint NFTs
-    require(hasRole(MINTER_ROLE, signer), "Signature invalid or unauthorized");
+    require(_verifyArtist(signer, merkleProof), "Not authorized!");
 
     // make sure that the redeemer is paying enough to cover the buyer's cost
     require(msg.value >= voucher.minPrice, "Insufficient funds to redeem");
 
     // first assign the token to the signer, to establish provenance on-chain
-    _mint(signer, voucher.tokenId);
+    _mint(redeemer, voucher.tokenId);
     _setTokenURI(voucher.tokenId, voucher.uri);
-
-    // transfer the token to the redeemer
-    _transfer(signer, redeemer, voucher.tokenId);
 
     emit Redeem(signer, redeemer, voucher.tokenId, msg.value);
 
@@ -161,6 +131,32 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     /*************************
      ACCESS CONTROL FUNCTIONS
      *************************/
+
+     // allows extended functionality for Dutch Auction etc
+    function extendedMinting(
+        address redeemer,
+        address signer,
+        uint price,
+        uint tokenId,
+        string calldata uri
+    )
+        external
+        payable
+        onlyRole(MINTER_ROLE)
+        returns (uint256) {
+
+        //enforce the minimum price
+        require(msg.value >= price, "Insufficient funds to redeem");
+
+        // mint the token to collector and set it's uri to the IPFS hash
+        _mint(redeemer, tokenId);
+        _setTokenURI(tokenId, uri);
+
+        // index creator, collector and payment data for subgraph
+        emit Redeem(signer, redeemer, tokenId, msg.value);
+
+        return tokenId;
+    }
 
     function pause() public onlyRole(PAUSER_ROLE) {
         _pause();
@@ -178,29 +174,14 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         _merkleRoot = newRoot;
     }
 
-    /** @dev Function for withdrawing ETH to Unchain via Giveth and Gitcoin
-    * Constants are used for transparency and safety
-    */
-    function withdrawAllSplit()
-        public
-    {
-        require(block.timestamp < 1648083600, "GR 13 is closed!  Use withdrawAll");
-        uint half = address(this).balance / 2;
-        emit Withdraw(GIVETH, half);
-        emit Withdraw(GITCOIN, half);
-        require(payable(GIVETH).send(half));
-        require(payable(GITCOIN).send(half));
-    }
-
     /** @dev Function for withdrawing ETH to Unchain via Giveth
     * Constants are used for transparency and safety
     */
     function withdrawAll()
         public
     {
-        require(block.timestamp > 1648083600, "GR 13 is still open! Use withdrawAllSplit");
-        emit Withdraw(GIVETH, address(this).balance);
-        require(payable(GIVETH).send(address(this).balance));
+        emit Withdraw(CRON, address(this).balance);
+        require(payable(CRON).send(address(this).balance));
     }
 
     function addCron(
