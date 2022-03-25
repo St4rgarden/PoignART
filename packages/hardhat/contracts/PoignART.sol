@@ -14,13 +14,10 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
 
     using ECDSA for bytes32;
 
-    // #todo change the GIVETH AND GITCOIN addresses to be correct
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
-    address public constant CRON = 0x66F59a4181f43b96fE929b711476be15C96B83B3;
-    // address public constant GIVETH = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
-    // address public constant GITCOIN = 0xde21F729137C5Af1b01d73aF1dC21eFfa2B8a0d6;
+    address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
 
     /*************************
      MAPPING STRUCTS EVENTS
@@ -75,7 +72,7 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
      *************************/
 
     // view function returns true if an artist address is part of the merkleTree
-    function _verifyArtist(
+    function verifyArtist(
 
         address _artist,
 
@@ -142,7 +139,7 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
     address signer = _verify(voucher, signature);
 
     // make sure that the signer is authorized to mint NFTs
-    require(_verifyArtist(signer, merkleProof), "Not authorized!");
+    require(verifyArtist(signer, merkleProof), "Not authorized!");
 
     return _redeemVoucher(redeemer, signer, voucher.minPrice, voucher.tokenId, voucher.uri);
   }
@@ -198,8 +195,8 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
     function withdrawAll()
         public
     {
-        emit Withdraw(CRON, address(this).balance);
-        require(payable(CRON).send(address(this).balance));
+        emit Withdraw(UNCHAIN, address(this).balance);
+        require(payable(UNCHAIN).send(address(this).balance));
     }
 
     function addCron(

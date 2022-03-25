@@ -77,14 +77,14 @@ describe("PoignART", () => {
     it("Should verify artist in merkle tree", async () => {
       const addresses = signers.slice(0, 3).map((s) => s.address);
       const proof = snapshot.getMerkleProof(addresses[0]);
-      expect(await token._verifyArtist(addresses[0], proof)).to.equal(true);
+      expect(await token.verifyArtist(addresses[0], proof)).to.equal(true);
     });
 
     it("Should not verify artist not in merkle tree", async () => {
       const addresses = signers.slice(0, 4).map((s) => s.address);
       const snapshot = getSnapshot(addresses);
       const proof = snapshot.getMerkleProof(addresses[3]);
-      expect(await token._verifyArtist(addresses[3], proof)).to.equal(false);
+      expect(await token.verifyArtist(addresses[3], proof)).to.equal(false);
     });
 
     it("Should not add new user to CRON_JOB role if not admin", async () => {
@@ -374,7 +374,7 @@ describe("PoignART", () => {
 
   describe("Withdraw Funds", () => {
     it("Should withdraw all funds", async () => {
-      const recipient = await token.CRON();
+      const recipient = await token.UNCHAIN();
       expect(await provider.getBalance(token.address)).to.equal(70);
       const oldBalance = await provider.getBalance(recipient);
 
@@ -387,7 +387,7 @@ describe("PoignART", () => {
 
     it("Should withdraw all funds again", async () => {
       console.log({ contractWithdraw: this.contractUnderTest?.address });
-      const recipient = await token.CRON();
+      const recipient = await token.UNCHAIN();
       expect(await provider.getBalance(token.address)).to.equal(0);
       const oldBalance = await provider.getBalance(recipient);
 
