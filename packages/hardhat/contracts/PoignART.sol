@@ -14,13 +14,10 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
 
     using ECDSA for bytes32;
 
-    // #todo change the GIVETH AND GITCOIN addresses to be correct
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CRON_JOB = keccak256("CRON_JOB");
-    address public constant CRON = 0x66F59a4181f43b96fE929b711476be15C96B83B3;
-    // address public constant GIVETH = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
-    // address public constant GITCOIN = 0xde21F729137C5Af1b01d73aF1dC21eFfa2B8a0d6;
+    address public constant UNCHAIN = 0x10E1439455BD2624878b243819E31CfEE9eb721C;
 
     /*************************
      MAPPING STRUCTS EVENTS
@@ -38,6 +35,8 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
 
     }
 
+    uint public minimumPrice;
+
     // event for indexing withdrawals
     event Withdraw(address indexed recipient, uint value);
     // event for indexing redeems
@@ -48,6 +47,7 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(CRON_JOB, msg.sender);
+        minimumPrice = 0.025 ether;
     }
 
     /*************************
@@ -72,7 +72,7 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
      *************************/
 
     // view function returns true if an artist address is part of the merkleTree
-    function _verifyArtist(
+    function verifyArtist(
 
         address _artist,
 
@@ -97,6 +97,32 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
      USER FUNCTIONS
      *************************/
 
+    function _redeemVoucher(
+        address redeemer,
+        address signer,
+        uint price,
+        uint tokenId,
+        string calldata uri
+    ) internal returns (uint) {
+        //enforce the minimum price
+        require(msg.value >= price, "Insufficient funds to redeem");
+        require(msg.value >= minimumPrice, "Value must be over the minimum price!");
+
+        // first assign the token to the signer, to establish provenance on-chain
+        _mint(signer, tokenId);
+
+        // assign the token URI to it's correct ipfs address
+        _setTokenURI(tokenId, uri);
+
+        // transfer the token to the redeemer
+        _transfer(signer, redeemer, tokenId);
+
+        // index creator, collector and payment data for subgraph
+        emit Redeem(signer, redeemer, tokenId, msg.value);
+
+        return tokenId;
+    }
+
     function redeem(
         address redeemer,
         NFTVoucher calldata voucher,
@@ -113,24 +139,24 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
     address signer = _verify(voucher, signature);
 
     // make sure that the signer is authorized to mint NFTs
-    require(_verifyArtist(signer, merkleProof), "Not authorized!");
+    require(verifyArtist(signer, merkleProof), "Not authorized!");
 
-    // make sure that the redeemer is paying enough to cover the buyer's cost
-    require(msg.value >= voucher.minPrice, "Insufficient funds to redeem");
-
-    // first assign the token to the signer, to establish provenance on-chain
-    _mint(redeemer, voucher.tokenId);
-    _setTokenURI(voucher.tokenId, voucher.uri);
-
-    emit Redeem(signer, redeemer, voucher.tokenId, msg.value);
-
-    return voucher.tokenId;
+    return _redeemVoucher(redeemer, signer, voucher.minPrice, voucher.tokenId, voucher.uri);
   }
 
 
     /*************************
      ACCESS CONTROL FUNCTIONS
      *************************/
+
+    // allows cron role to change the minimum price
+    function setMinimum(
+            uint newMinimum
+    )
+        external
+        onlyRole(CRON_JOB) {
+        minimumPrice = newMinimum;
+    }
 
      // allows extended functionality for Dutch Auction etc
     function extendedMinting(
@@ -144,18 +170,7 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
         payable
         onlyRole(MINTER_ROLE)
         returns (uint256) {
-
-        //enforce the minimum price
-        require(msg.value >= price, "Insufficient funds to redeem");
-
-        // mint the token to collector and set it's uri to the IPFS hash
-        _mint(redeemer, tokenId);
-        _setTokenURI(tokenId, uri);
-
-        // index creator, collector and payment data for subgraph
-        emit Redeem(signer, redeemer, tokenId, msg.value);
-
-        return tokenId;
+        return _redeemVoucher(redeemer, signer, price, tokenId, uri);
     }
 
     function pause() public onlyRole(PAUSER_ROLE) {
@@ -180,8 +195,8 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
     function withdrawAll()
         public
     {
-        emit Withdraw(CRON, address(this).balance);
-        require(payable(CRON).send(address(this).balance));
+        emit Withdraw(UNCHAIN, address(this).balance);
+        require(payable(UNCHAIN).send(address(this).balance));
     }
 
     function addCron(
