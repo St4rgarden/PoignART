@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
+contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
 
     using ECDSA for bytes32;
 
@@ -238,19 +238,6 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         override
     {
         super._beforeTokenTransfer(from, to, tokenId);
-    }
-
-    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
-        super._burn(tokenId);
-    }
-
-    function tokenURI(uint256 tokenId)
-        public
-        view
-        override(ERC721, ERC721URIStorage)
-        returns (string memory)
-    {
-        return super.tokenURI(tokenId);
     }
 
     function supportsInterface(bytes4 interfaceId)
