@@ -31,6 +31,7 @@ tenderly.yaml
 
 # testing
 coverage
+coverage.json
 
 # production
 build
@@ -67,3 +68,6 @@ yarn-error.log*
 
 # doc directory
 /doc
+
+# vim swap files
+*.sw[a-z]
