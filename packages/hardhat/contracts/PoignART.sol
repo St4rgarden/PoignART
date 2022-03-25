@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
+contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
 
     using ECDSA for bytes32;
 
@@ -38,7 +38,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     }
 
-    uint minimumPrice;
+    uint public minimumPrice;
 
     // event for indexing withdrawals
     event Withdraw(address indexed recipient, uint value);
@@ -100,6 +100,32 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
      USER FUNCTIONS
      *************************/
 
+    function _redeemVoucher(
+        address redeemer,
+        address signer,
+        uint price,
+        uint tokenId,
+        string calldata uri
+    ) internal returns (uint) {
+        //enforce the minimum price
+        require(msg.value >= price, "Insufficient funds to redeem");
+        require(msg.value >= minimumPrice, "Value must be over the minimum price!");
+
+        // first assign the token to the signer, to establish provenance on-chain
+        _mint(signer, tokenId);
+
+        // assign the token URI to it's correct ipfs address
+        _setTokenURI(tokenId, uri);
+
+        // transfer the token to the redeemer
+        _transfer(signer, redeemer, tokenId);
+
+        // index creator, collector and payment data for subgraph
+        emit Redeem(signer, redeemer, tokenId, msg.value);
+
+        return tokenId;
+    }
+
     function redeem(
         address redeemer,
         NFTVoucher calldata voucher,
@@ -118,22 +144,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     // make sure that the signer is authorized to mint NFTs
     require(_verifyArtist(signer, merkleProof), "Not authorized!");
 
-    // make sure that the redeemer is paying enough to cover the buyer's cost
-    require(msg.value >= voucher.minPrice, "Insufficient funds to redeem");
-    require(msg.value >= minimumPrice, "Value must be over the minimum price!");
-
-    // first assign the token to the signer, to establish provenance on-chain
-    _mint(signer, voucher.tokenId);
-
-    // assign the token URI to it's correct ipfs address
-    _setTokenURI(voucher.tokenId, voucher.uri);
-
-    // transfer the token to the redeemer
-    _transfer(signer, redeemer, voucher.tokenId);
-
-    emit Redeem(signer, redeemer, voucher.tokenId, msg.value);
-
-    return voucher.tokenId;
+    return _redeemVoucher(redeemer, signer, voucher.minPrice, voucher.tokenId, voucher.uri);
   }
 
 
@@ -162,24 +173,7 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         payable
         onlyRole(MINTER_ROLE)
         returns (uint256) {
-
-        //enforce the minimum price
-        require(msg.value >= price, "Insufficient funds to redeem");
-        require(msg.value >= minimumPrice, "Value must be over the minimum price!");
-
-        // first assign the token to the signer, to establish provenance on-chain
-        _mint(signer, tokenId);
-
-        // assign the token URI to it's correct ipfs address
-        _setTokenURI(tokenId, uri);
-
-        // transfer the token to the redeemer
-        _transfer(signer, redeemer, tokenId);
-
-        // index creator, collector and payment data for subgraph
-        emit Redeem(signer, redeemer, tokenId, msg.value);
-
-        return tokenId;
+        return _redeemVoucher(redeemer, signer, price, tokenId, uri);
     }
 
     function pause() public onlyRole(PAUSER_ROLE) {
@@ -262,19 +256,6 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
         override
     {
         super._beforeTokenTransfer(from, to, tokenId);
-    }
-
-    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
-        super._burn(tokenId);
-    }
-
-    function tokenURI(uint256 tokenId)
-        public
-        view
-        override(ERC721, ERC721URIStorage)
-        returns (string memory)
-    {
-        return super.tokenURI(tokenId);
     }
 
     function supportsInterface(bytes4 interfaceId)
