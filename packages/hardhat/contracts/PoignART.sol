@@ -38,16 +38,19 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     }
 
+    uint minimumPrice;
+
     // event for indexing withdrawals
     event Withdraw(address indexed recipient, uint value);
     // event for indexing redeems
     event Redeem(address indexed signer, address indexed redeemer, uint tokenId, uint value);
 
-    constructor() ERC721("PoignART", "[+++||=====>") EIP712("PoignardVoucher", "1") {
+    constructor() ERC721("PoignART", "[+++||=====>") EIP712("PoignartVoucher", "1") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(CRON_JOB, msg.sender);
+        minimumPrice = 0.025 ether;
     }
 
     /*************************
@@ -117,10 +120,16 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
     // make sure that the redeemer is paying enough to cover the buyer's cost
     require(msg.value >= voucher.minPrice, "Insufficient funds to redeem");
+    require(msg.value >= minimumPrice, "Value must be over the minimum price!");
 
     // first assign the token to the signer, to establish provenance on-chain
-    _mint(redeemer, voucher.tokenId);
+    _mint(signer, voucher.tokenId);
+
+    // assign the token URI to it's correct ipfs address
     _setTokenURI(voucher.tokenId, voucher.uri);
+
+    // transfer the token to the redeemer
+    _transfer(signer, redeemer, voucher.tokenId);
 
     emit Redeem(signer, redeemer, voucher.tokenId, msg.value);
 
@@ -131,6 +140,15 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
     /*************************
      ACCESS CONTROL FUNCTIONS
      *************************/
+
+    // allows cron role to change the minimum price
+    function setMinimum(
+            uint newMinimum
+    )
+        external
+        onlyRole(CRON_JOB) {
+        minimumPrice = newMinimum;
+    }
 
      // allows extended functionality for Dutch Auction etc
     function extendedMinting(
@@ -147,10 +165,16 @@ contract PoignART is ERC721, EIP712, ERC721URIStorage, Pausable, AccessControl {
 
         //enforce the minimum price
         require(msg.value >= price, "Insufficient funds to redeem");
+        require(msg.value >= minimumPrice, "Value must be over the minimum price!");
 
-        // mint the token to collector and set it's uri to the IPFS hash
-        _mint(redeemer, tokenId);
+        // first assign the token to the signer, to establish provenance on-chain
+        _mint(signer, tokenId);
+
+        // assign the token URI to it's correct ipfs address
         _setTokenURI(tokenId, uri);
+
+        // transfer the token to the redeemer
+        _transfer(signer, redeemer, tokenId);
 
         // index creator, collector and payment data for subgraph
         emit Redeem(signer, redeemer, tokenId, msg.value);
