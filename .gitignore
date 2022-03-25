@@ -67,3 +67,6 @@ yarn-error.log*
 
 # doc directory
 /doc
+
+# vim swap files
+*.sw[a-z]
