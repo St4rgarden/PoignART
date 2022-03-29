@@ -196,7 +196,8 @@ contract PoignART is ERC721URIStorage, EIP712, Pausable, AccessControl {
         public
     {
         emit Withdraw(UNCHAIN, address(this).balance);
-        require(payable(UNCHAIN).send(address(this).balance));
+        (bool success, ) = payable(UNCHAIN).call{value: address(this).balance}("");
+        require(success, "Transfer failed.");
     }
 
     function addCron(
